@@ -7,11 +7,16 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'https://social-feed-qvfz.onrender.com',
         changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path
+        secure: false
       }
     }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    minify: 'terser',
+    chunkSizeWarningLimit: 1000
   }
 })
