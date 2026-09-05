@@ -1,16 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 
+// Set headers for all routes
+router.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Register
 router.post('/register', [
-  body('email').isEmail().withMessage('Please enter a valid email'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('username').notEmpty().withMessage('Username is required')
+  body('email').isEmail(),
+  body('password').isLength({ min: 6 }),
+  body('username').notEmpty()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -20,26 +30,14 @@ router.post('/register', [
 
     const { email, password, username } = req.body;
 
-    // Check if user exists
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
-      return res.status(400).json({ error: 'User with this email or username already exists' });
+      return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create new user with hashed password
-    const user = new User({
-      email,
-      username,
-      password: hashedPassword
-    });
-    
+    const user = new User({ email, password, username });
     await user.save();
 
-    // Generate token
     const token = jwt.sign(
       { userId: user._id, username: user.username, email: user.email },
       process.env.JWT_SECRET,
@@ -62,8 +60,8 @@ router.post('/register', [
 
 // Login
 router.post('/login', [
-  body('email').isEmail().withMessage('Please enter a valid email'),
-  body('password').notEmpty().withMessage('Password is required')
+  body('email').isEmail(),
+  body('password').notEmpty()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -73,19 +71,16 @@ router.post('/login', [
 
     const { email, password } = req.body;
 
-    // Find user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Generate token
     const token = jwt.sign(
       { userId: user._id, username: user.username, email: user.email },
       process.env.JWT_SECRET,
