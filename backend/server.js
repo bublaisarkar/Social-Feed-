@@ -32,10 +32,10 @@ app.use(cors({
 }));
 
 // Alternative simple CORS (if you want to allow all during development)
-// app.use(cors({
-//   origin: '*',
-//   credentials: true
-// }));
+app.use(cors({
+  origin: ['https://social-feed-qvfz.onrender.com', 'http://localhost:3000'],
+  credentials: true
+}));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
