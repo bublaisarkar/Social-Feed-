@@ -1,9 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+
+// Add CORS headers to all auth routes
+router.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Register
 router.post('/register', [
@@ -16,7 +33,6 @@ router.post('/register', [
     
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ Validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
@@ -25,12 +41,19 @@ router.post('/register', [
     // Check if user exists
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
-      console.log('❌ User already exists:', email);
       return res.status(400).json({ error: 'User with this email or username already exists' });
     }
 
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
     // Create new user
-    const user = new User({ email, password, username });
+    const user = new User({ 
+      email, 
+      password: hashedPassword, 
+      username 
+    });
     await user.save();
     console.log('✅ User created:', user._id);
 
@@ -65,7 +88,6 @@ router.post('/login', [
     
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ Validation errors:', errors.array());
       return res.status(400).json({ errors: errors.array() });
     }
 
@@ -78,22 +100,11 @@ router.post('/login', [
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    console.log('✅ User found:', user._id);
-    console.log('Password type:', typeof user.password);
-    console.log('Has comparePassword method:', typeof user.comparePassword);
-
-    // Check password - with error handling
-    try {
-      const isMatch = await user.comparePassword(password);
-      console.log('Password match:', isMatch);
-      
-      if (!isMatch) {
-        console.log('❌ Password mismatch for:', email);
-        return res.status(400).json({ error: 'Invalid credentials' });
-      }
-    } catch (compareError) {
-      console.error('❌ Password comparison error:', compareError);
-      return res.status(500).json({ error: 'Error verifying password' });
+    // Check password - Direct bcrypt compare
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      console.log('❌ Password mismatch for:', email);
+      return res.status(400).json({ error: 'Invalid credentials' });
     }
 
     // Generate token
