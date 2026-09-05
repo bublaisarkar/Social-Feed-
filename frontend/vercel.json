@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "npm install && npm run build",
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
@@ -11,6 +11,6 @@
     }
   ],
   "env": {
-    "REACT_APP_API_URL": "https://social-feed-qvfz.onrender.com/api"
+    "VITE_API_URL": "https://social-feed-qvfz.onrender.com/api"
   }
 }
